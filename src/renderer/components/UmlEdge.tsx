@@ -8,10 +8,11 @@ export function UmlEdge(props: EdgeProps) {
   const [path, labelX, labelY] = getStraightPath({ sourceX: props.sourceX, sourceY: props.sourceY, targetX: props.targetX, targetY: props.targetY });
   const directional = data ? relationshipIsDirectional(data.kind) : false;
   const dashed = data?.kind === 'dependency' || data?.kind === 'extend' || data?.kind === 'include';
+  const style = (data as UmlEdgeData & { style?: Record<string, string | number> } | undefined)?.style ?? {};
   const label = [data?.label, data?.guard && `[${data.guard}]`].filter(Boolean).join(' ');
   return (
     <>
-      <BaseEdge id={props.id} path={path} markerEnd={directional ? MarkerType.ArrowClosed : undefined} style={{ stroke: props.selected ? '#2563eb' : '#50627a', strokeWidth: props.selected ? 2.5 : 1.5, strokeDasharray: dashed ? '6 4' : undefined }} />
+      <BaseEdge id={props.id} path={path} markerEnd={directional ? MarkerType.ArrowClosed : undefined} style={{ stroke: props.selected ? '#2563eb' : String(style.stroke ?? '#50627a'), strokeWidth: props.selected ? 2.5 : Number(style.strokeWidth ?? 1.5), strokeDasharray: style.lineStyle === 'dotted' ? '2 4' : style.lineStyle === 'dashed' || dashed ? '6 4' : undefined }} />
       {(label || data?.sourceMultiplicity || data?.targetMultiplicity) && <EdgeLabelRenderer>
         <div className="edge-label" style={{ transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)` }}>
           {data?.sourceMultiplicity && <span className="edge-multiplicity source-multiplicity">{data.sourceMultiplicity}</span>}

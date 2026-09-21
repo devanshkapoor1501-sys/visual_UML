@@ -1,4 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import type { CSSProperties } from 'react';
 import { ELEMENT_LABELS, type DiagramView, type UmlElement } from '../../shared/model';
 
 export type UmlNodeData = {
@@ -22,24 +23,32 @@ function ActorShape({ element }: { element: UmlElement }) {
 }
 
 export function UmlNode({ data, selected }: NodeProps) {
-  const { element } = data as unknown as UmlNodeData;
+  const { element, view } = data as unknown as UmlNodeData;
   const props = element.properties;
+  const style = view.style ?? {};
+  const nodeStyle: CSSProperties = {
+    background: typeof style.fill === 'string' ? style.fill : undefined,
+    borderColor: typeof style.stroke === 'string' ? style.stroke : undefined,
+    borderWidth: typeof style.strokeWidth === 'number' ? style.strokeWidth : undefined,
+    borderRadius: typeof style.radius === 'number' ? style.radius : undefined,
+    fontSize: typeof style.fontSize === 'number' ? style.fontSize : undefined,
+  };
   const classLike = ['class', 'interface', 'object'].includes(element.kind);
   const simpleShape = ['initial', 'final', 'decision', 'fork', 'join'].includes(element.kind);
 
-  if (element.kind === 'actor') return <div className={`uml-node actor-node ${selected ? 'selected' : ''}`}><Handles /><ActorShape element={element} /></div>;
-  if (element.kind === 'use-case') return <div className={`uml-node use-case-node ${selected ? 'selected' : ''}`}><Handles /><div className="use-case-shape">{element.name}</div></div>;
+  if (element.kind === 'actor') return <div className={`uml-node actor-node ${selected ? 'selected' : ''}`} style={nodeStyle}><Handles /><ActorShape element={element} /></div>;
+  if (element.kind === 'use-case') return <div className={`uml-node use-case-node ${selected ? 'selected' : ''}`} style={nodeStyle}><Handles /><div className="use-case-shape">{element.name}</div></div>;
   if (element.kind === 'initial') return <div className={`uml-node tiny-node ${selected ? 'selected' : ''}`}><Handles /><div className="initial-shape" /></div>;
   if (element.kind === 'final') return <div className={`uml-node tiny-node ${selected ? 'selected' : ''}`}><Handles /><div className="final-shape"><span /></div></div>;
   if (element.kind === 'decision') return <div className={`uml-node tiny-node ${selected ? 'selected' : ''}`}><Handles /><div className="decision-shape" /></div>;
   if (element.kind === 'fork' || element.kind === 'join') return <div className={`uml-node bar-node ${selected ? 'selected' : ''}`}><Handles /><div className="fork-shape" /></div>;
-  if (element.kind === 'note') return <div className={`uml-node note-node ${selected ? 'selected' : ''}`}><Handles /><div className="note-fold" /><div className="node-text">{props.text || element.name}</div></div>;
-  if (element.kind === 'partition') return <div className={`uml-node partition-node ${selected ? 'selected' : ''}`}><Handles /><div className="partition-title">{element.name}</div><div className="partition-content">Partition</div></div>;
-  if (element.kind === 'lifeline') return <div className={`uml-node lifeline-node ${selected ? 'selected' : ''}`}><Handles /><div className="lifeline-head">{element.name}</div><div className="lifeline-line" /></div>;
+  if (element.kind === 'note') return <div className={`uml-node note-node ${selected ? 'selected' : ''}`} style={nodeStyle}><Handles /><div className="note-fold" /><div className="node-text">{props.text || element.name}</div></div>;
+  if (element.kind === 'partition') return <div className={`uml-node partition-node ${selected ? 'selected' : ''}`} style={nodeStyle}><Handles /><div className="partition-title">{element.name}</div><div className="partition-content">Partition</div></div>;
+  if (element.kind === 'lifeline') return <div className={`uml-node lifeline-node ${selected ? 'selected' : ''}`} style={nodeStyle}><Handles /><div className="lifeline-head">{element.name}</div><div className="lifeline-line" /></div>;
   if (simpleShape) return null;
 
   return (
-    <div className={`uml-node ${classLike ? 'class-like' : 'component-like'} ${selected ? 'selected' : ''}`}>
+    <div className={`uml-node ${classLike ? 'class-like' : 'component-like'} ${selected ? 'selected' : ''}`} style={nodeStyle}>
       <Handles />
       <div className="node-header">
         {props.stereotype && <div className="stereotype">&lt;&lt;{props.stereotype}&gt;&gt;</div>}
@@ -54,4 +63,3 @@ export function UmlNode({ data, selected }: NodeProps) {
     </div>
   );
 }
-

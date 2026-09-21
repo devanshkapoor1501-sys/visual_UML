@@ -1,11 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Background, Controls, MiniMap, ReactFlow, ReactFlowProvider, applyEdgeChanges, applyNodeChanges, type Connection, type Edge, type EdgeChange, type Node, type NodeChange, type OnNodeDrag, type ReactFlowInstance } from '@xyflow/react';
 import { toPng } from 'html-to-image';
 import { Grid3X3, Hand, Magnet, Map, MousePointer2, Scan, Share2, StickyNote, ZoomIn, ZoomOut } from 'lucide-react';
 import { getActiveDiagram, useProjectStore } from '../store/useProjectStore';
 import { useWorkspaceStore, type CanvasPreferences, type EditorTool } from '../store/useWorkspaceStore';
 import { buildDiagramSvg, downloadDataUrl, downloadText } from '../lib/export';
-import { validateRelationship, type DiagramKind, type Project, type RelationshipKind } from '../../shared/model';
+import { validateRelationship, type DiagramKind, type Project, type RelationshipKind, type UmlElementKind } from '../../shared/model';
 import { UmlNode } from './ElementNode';
 import { UmlEdge } from './UmlEdge';
 
@@ -15,15 +15,15 @@ const edgeTypes = { uml: UmlEdge };
 export type UmlCanvasHandle = { exportPng: () => Promise<void>; exportSvg: () => void; fitView: () => void; zoomIn: () => void; zoomOut: () => void };
 type CanvasContextEvent = { clientX: number; clientY: number; stopPropagation: () => void };
 
-export const UmlCanvas = forwardRef<UmlCanvasHandle, { relationshipKind: RelationshipKind; editorTool: EditorTool; canvasPreferences: CanvasPreferences; onContextMenu: (event: CanvasContextEvent, type: 'canvas' | 'node' | 'edge', targetId?: string) => void; onNotice: (message: string) => void }>(({ relationshipKind, editorTool, canvasPreferences, onContextMenu, onNotice }, ref) => {
+export const UmlCanvas = forwardRef<UmlCanvasHandle, { relationshipKind: RelationshipKind; editorTool: EditorTool; canvasPreferences: CanvasPreferences; focusNodeId?: string | null; onContextMenu: (event: CanvasContextEvent, type: 'canvas' | 'node' | 'edge', targetId?: string) => void; onNotice: (message: string) => void }>(({ relationshipKind, editorTool, canvasPreferences, focusNodeId, onContextMenu, onNotice }, ref) => {
   const project = useProjectStore((state) => state.project);
   const activeDiagramId = useProjectStore((state) => state.activeDiagramId);
   const diagram = getActiveDiagram(project, activeDiagramId);
   if (!diagram) return <div className="canvas-empty">Create a diagram to begin modeling.</div>;
-  return <ReactFlowProvider><CanvasInner key={diagram.id} project={project} diagramKind={diagram.kind} diagramId={diagram.id} relationshipKind={relationshipKind} editorTool={editorTool} canvasPreferences={canvasPreferences} onContextMenu={onContextMenu} onNotice={onNotice} ref={ref} /></ReactFlowProvider>;
+  return <ReactFlowProvider><CanvasInner key={diagram.id} project={project} diagramKind={diagram.kind} diagramId={diagram.id} relationshipKind={relationshipKind} editorTool={editorTool} canvasPreferences={canvasPreferences} focusNodeId={focusNodeId} onContextMenu={onContextMenu} onNotice={onNotice} ref={ref} /></ReactFlowProvider>;
 });
 
-const CanvasInner = forwardRef<UmlCanvasHandle, { project: Project; diagramId: string; diagramKind: DiagramKind; relationshipKind: RelationshipKind; editorTool: EditorTool; canvasPreferences: CanvasPreferences; onContextMenu: (event: CanvasContextEvent, type: 'canvas' | 'node' | 'edge', targetId?: string) => void; onNotice: (message: string) => void }>(({ project, diagramId, diagramKind, relationshipKind, editorTool, canvasPreferences, onContextMenu, onNotice }, ref) => {
+const CanvasInner = forwardRef<UmlCanvasHandle, { project: Project; diagramId: string; diagramKind: DiagramKind; relationshipKind: RelationshipKind; editorTool: EditorTool; canvasPreferences: CanvasPreferences; focusNodeId?: string | null; onContextMenu: (event: CanvasContextEvent, type: 'canvas' | 'node' | 'edge', targetId?: string) => void; onNotice: (message: string) => void }>(({ project, diagramId, diagramKind, relationshipKind, editorTool, canvasPreferences, focusNodeId, onContextMenu, onNotice }, ref) => {
   const diagram = project.diagrams.find((item) => item.id === diagramId)!;
   const selection = useProjectStore((state) => state.selection);
   const setSelection = useProjectStore((state) => state.setSelection);
@@ -35,6 +35,7 @@ const CanvasInner = forwardRef<UmlCanvasHandle, { project: Project; diagramId: s
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [instance, setInstance] = useState<ReactFlowInstance | null>(null);
+  const programmaticSelection = useRef(false);
 
   const diagramNodes = useMemo<Node[]>(() => diagram.views.flatMap((view) => {
     const element = project.model.elements[view.elementId];
@@ -49,6 +50,14 @@ const CanvasInner = forwardRef<UmlCanvasHandle, { project: Project; diagramId: s
 
   useEffect(() => setNodes(diagramNodes), [diagramNodes]);
   useEffect(() => setEdges(diagramEdges), [diagramEdges]);
+  useEffect(() => {
+    if (!focusNodeId || !diagram.views.some((view) => view.elementId === focusNodeId)) return;
+    programmaticSelection.current = true;
+    setNodes((current) => current.map((node) => ({ ...node, selected: node.id === focusNodeId })));
+    setSelection({ nodeIds: [focusNodeId], edgeIds: [] });
+    const timeout = window.setTimeout(() => { programmaticSelection.current = false; }, 160);
+    return () => window.clearTimeout(timeout);
+  }, [focusNodeId, diagram.id, diagram.views, setSelection]);
 
   useImperativeHandle(ref, () => ({
     exportSvg: () => {
@@ -93,8 +102,15 @@ const CanvasInner = forwardRef<UmlCanvasHandle, { project: Project; diagramId: s
     setSelection({ nodeIds: deleted.map((node) => node.id), edgeIds: [] });
     deleteSelection();
   };
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const kind = event.dataTransfer.getData('application/x-uml-element') as UmlElementKind;
+    if (!kind || !instance) return;
+    const point = instance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    addElementAt(kind, point.x, point.y);
+  };
 
-  return <div className={`canvas-shell editor-tool-${editorTool}`} data-diagram-id={diagram.id}>
+  return <div className={`canvas-shell editor-tool-${editorTool}`} data-diagram-id={diagram.id} onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
     <ReactFlow
       nodes={nodes}
       edges={edges}
@@ -109,7 +125,7 @@ const CanvasInner = forwardRef<UmlCanvasHandle, { project: Project; diagramId: s
       onNodeContextMenu={(event, node) => { event.preventDefault(); onContextMenu(event, 'node', node.id); }}
       onEdgeContextMenu={(event, edge) => { event.preventDefault(); onContextMenu(event, 'edge', edge.id); }}
       onPaneContextMenu={(event) => { event.preventDefault(); onContextMenu(event, 'canvas'); }}
-      onSelectionChange={({ nodes: selectedNodes, edges: selectedEdges }) => setSelection({ nodeIds: selectedNodes.map((node) => node.id), edgeIds: selectedEdges.map((edge) => edge.id) })}
+      onSelectionChange={({ nodes: selectedNodes, edges: selectedEdges }) => { if (!programmaticSelection.current) setSelection({ nodeIds: selectedNodes.map((node) => node.id), edgeIds: selectedEdges.map((edge) => edge.id) }); }}
       onPaneClick={(event) => {
         if (editorTool === 'note' && instance) {
           const point = instance.screenToFlowPosition({ x: event.clientX, y: event.clientY });

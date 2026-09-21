@@ -39,6 +39,7 @@ type ProjectStore = {
   deleteDiagram: (diagramId: string) => void;
   addElement: (kind: UmlElementKind) => void;
   addElementAt: (kind: UmlElementKind, x: number, y: number) => void;
+  addExistingElementToDiagram: (elementId: string) => void;
   updateElement: (elementId: string, patch: Partial<{ name: string; properties: ElementProperties }>) => void;
   updateView: (elementId: string, patch: Partial<DiagramView>, recordHistory?: boolean) => void;
   updateViewport: (viewport: Viewport) => void;
@@ -151,6 +152,21 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const element = defaultElement(kind);
       project.model.elements[element.id] = element;
       diagram.views.push({ ...defaultView(element.id, diagram.views.length), x, y });
+    });
+  },
+
+  addExistingElementToDiagram: (elementId) => {
+    const { activeDiagramId } = get();
+    get().commit((project) => {
+      const diagram = activeDiagram(project, activeDiagramId);
+      const element = project.model.elements[elementId];
+      if (!diagram || !element || diagram.views.some((view) => view.elementId === elementId)) return;
+      let slot = 0;
+      while (diagram.views.some((view) => {
+        const candidate = defaultView(elementId, slot);
+        return view.x === candidate.x && view.y === candidate.y;
+      })) slot += 1;
+      diagram.views.push(defaultView(elementId, slot));
     });
   },
 

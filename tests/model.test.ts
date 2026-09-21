@@ -2,8 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyProject, defaultElement, diagramElementKinds, validateRelationship } from '../src/shared/model';
 import { deserializeProject, serializeProject } from '../src/shared/serialization';
 import { useProjectStore } from '../src/renderer/store/useProjectStore';
+import { defaultWorkspacePreferences } from '../src/renderer/store/useWorkspaceStore';
 
 describe('UML model', () => {
+  it('provides the hybrid IDE workspace defaults', () => {
+    expect(defaultWorkspacePreferences.theme).toBe('dark');
+    expect(defaultWorkspacePreferences.leftRailTab).toBe('diagrams');
+    expect(defaultWorkspacePreferences.rightRailTab).toBe('model');
+    expect(defaultWorkspacePreferences.bottomPanelCollapsed).toBe(false);
+  });
+
   it('creates a usable project with one class diagram', () => {
     const project = createEmptyProject();
     expect(project.diagrams).toHaveLength(1);
@@ -74,5 +82,16 @@ describe('UML model', () => {
     expect(views).toHaveLength(2);
     expect(new Set(views.map((view) => `${view.x}:${view.y}`)).size).toBe(2);
     expect(views.map((view) => `${view.x}:${view.y}`)).toContain('100:80');
+  });
+
+  it('can place an existing shared model element on the active diagram', () => {
+    const store = useProjectStore;
+    store.getState().newProject();
+    store.getState().addElement('class');
+    const elementId = store.getState().project.diagrams[0].views[0].elementId;
+    store.getState().addDiagram('sequence');
+    expect(store.getState().project.diagrams[1].views).toHaveLength(0);
+    store.getState().addExistingElementToDiagram(elementId);
+    expect(store.getState().project.diagrams[1].views[0].elementId).toBe(elementId);
   });
 });
