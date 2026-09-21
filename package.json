@@ -1,0 +1,45 @@
+{
+  "name": "uml-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A private local-first UML modeling workspace.",
+  "main": "dist-electron/main/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "build": "tsc -p tsconfig.node.json && vite build --configLoader runner && electron-builder",
+    "test": "vitest run",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.8.6",
+    "html-to-image": "^1.11.13",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.local.umlstudio",
+    "productName": "UML Studio",
+    "files": ["dist/**/*", "dist-electron/**/*"],
+    "directories": { "output": "release" },
+    "win": { "target": "nsis", "signAndEditExecutable": false },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage" }
+  }
+}

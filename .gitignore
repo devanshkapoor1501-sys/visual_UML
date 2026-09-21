@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-electron
+release/*
+!release/
+!release/UML Studio Setup 0.1.0.exe
+.vite
+*.log
